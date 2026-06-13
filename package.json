@@ -1,0 +1,21 @@
+{
+	"name": "text-toolbar",
+	"version": "0.1.0",
+	"description": "A floating formatting toolbar for Obsidian",
+	"main": "main.js",
+	"scripts": {
+		"dev": "node esbuild.config.mjs",
+		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production"
+	},
+	"keywords": [],
+	"author": "John Morabito",
+	"license": "MIT",
+	"devDependencies": {
+		"@types/node": "^18.0.0",
+		"builtin-modules": "^3.3.0",
+		"esbuild": "^0.25.0",
+		"esbuild-sass-plugin": "^3.3.1",
+		"obsidian": "latest",
+		"typescript": "^5.0.0"
+	}
+}
