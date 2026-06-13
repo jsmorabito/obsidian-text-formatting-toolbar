@@ -1,6 +1,6 @@
 {
-	"id": "text-toolbar",
-	"name": "Text Toolbar",
+	"id": "text-formatting-toolbar",
+	"name": "Text Formatting Toolbar",
 	"version": "0.1.0",
 	"minAppVersion": "1.0.0",
 	"description": "A floating formatting toolbar that appears above selected text in the editor.",
