@@ -142,7 +142,6 @@ export default class TextToolbarManager {
 		switch (id) {
 			case "bold":          this.toggleInlineFormat("**"); break;
 			case "italic":        this.toggleInlineFormat("*");  break;
-			case "underline":     this.toggleTagFormat("<u>", "</u>"); break;
 			case "strikethrough": this.toggleInlineFormat("~~"); break;
 			case "highlight":     this.toggleInlineFormat("=="); break;
 			case "code":          this.toggleInlineFormat("`");  break;
@@ -219,41 +218,6 @@ export default class TextToolbarManager {
 				{ line: from.line, ch: contentCh + m },
 				{ line: from.line, ch: contentCh + m + content.length },
 			);
-		}
-	}
-
-	private toggleTagFormat(open: string, close: string): void {
-		const view = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
-		if (!view) return;
-		const editor = view.editor;
-		const sel  = editor.getSelection();
-		if (!sel) return;
-
-		const from       = editor.getCursor("from");
-		const singleLine = from.line === editor.getCursor("to").line;
-
-		const prefixMatch = sel.match(/^(#{1,6} |> |- \[[ xX]\] |[-*+] |\d+\. )/);
-		const prefix  = prefixMatch ? prefixMatch[0] : "";
-		const content = sel.slice(prefix.length);
-		const contentCh = from.ch + prefix.length;
-
-		if (content.startsWith(open) && content.endsWith(close) && content.length > open.length + close.length) {
-			const inner = content.slice(open.length, -close.length);
-			editor.replaceSelection(prefix + inner);
-			if (singleLine) {
-				editor.setSelection(
-					{ line: from.line, ch: contentCh },
-					{ line: from.line, ch: contentCh + inner.length },
-				);
-			}
-		} else {
-			editor.replaceSelection(`${prefix}${open}${content}${close}`);
-			if (singleLine) {
-				editor.setSelection(
-					{ line: from.line, ch: contentCh + open.length },
-					{ line: from.line, ch: contentCh + open.length + content.length },
-				);
-			}
 		}
 	}
 
