@@ -8,6 +8,7 @@ export default class TextToolbarManager {
 	private toolbarEl: HTMLElement | null = null;
 	private externalCommands: TextToolbarExternalCommand[] = [];
 	private isMouseDown = false;
+	private mouseDownInContent = false;
 	private showTimeout: number | null = null;
 	private lastTop = "-9999px";
 	private lastLeft = "-9999px";
@@ -30,6 +31,7 @@ export default class TextToolbarManager {
 			if (this.toolbarEl?.contains(e.target as Node)) return;
 			this.isMouseDown = true;
 			this.isPinned = false;
+			this.mouseDownInContent = !!(e.target as Element)?.closest(".cm-content");
 			this.hide();
 		});
 
@@ -38,6 +40,7 @@ export default class TextToolbarManager {
 			this.isMouseDown = false;
 			this.isPinned = false;
 			if (!this.plugin.settings.enabled) return;
+			if (!this.mouseDownInContent) return;
 			if (this.showTimeout !== null) window.clearTimeout(this.showTimeout);
 			this.showTimeout = window.setTimeout(() => this.checkAndShow(), 30);
 		});
