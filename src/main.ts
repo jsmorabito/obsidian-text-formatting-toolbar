@@ -30,7 +30,7 @@ export default class TextToolbarPlugin extends Plugin {
 	}
 
 	public async loadSettings(): Promise<void> {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData() as Partial<TextToolbarSettings>);
 		this.settings.hideCommands ??= [];
 	}
 
@@ -63,11 +63,10 @@ class TextToolbarSettingTab extends PluginSettingTab {
 					})
 			);
 
-		containerEl.createEl("h3", { text: "Default commands" });
-		containerEl.createEl("p", {
-			text: "Toggle which built-in formatting buttons appear in the toolbar.",
-			cls: "setting-item-description",
-		});
+		new Setting(containerEl)
+			.setName("Default commands")
+			.setHeading()
+			.setDesc("Toggle which built-in formatting buttons appear in the toolbar.");
 
 		for (const cmd of TEXT_TOOLBAR_DEFAULT_COMMANDS) {
 			new Setting(containerEl)

@@ -1,4 +1,4 @@
-import { Editor, MarkdownView, Platform, setIcon } from "obsidian";
+import { App, Editor, MarkdownView, Platform, setIcon } from "obsidian";
 import { TEXT_TOOLBAR_DEFAULT_COMMANDS } from "./constants";
 import { TextToolbarExternalCommand } from "./types";
 import type TextToolbarPlugin from "./main";
@@ -8,7 +8,9 @@ export default class TextToolbarManager {
 	private toolbarEl: HTMLElement | null = null;
 	private externalCommands: TextToolbarExternalCommand[] = [];
 	private isMouseDown = false;
-	private showTimeout: ReturnType<typeof setTimeout> | null = null;
+	private showTimeout: number | null = null;
+	private lastTop = "-9999px";
+	private lastLeft = "-9999px";
 	private isPinned = false;
 	private formatPending = false;
 	private lastRect: DOMRect | null = null;
@@ -24,30 +26,30 @@ export default class TextToolbarManager {
 
 		this.createToolbar();
 
-		this.plugin.registerDomEvent(document, "mousedown", (e: MouseEvent) => {
+		this.plugin.registerDomEvent(activeDocument, "mousedown", (e: MouseEvent) => {
 			if (this.toolbarEl?.contains(e.target as Node)) return;
 			this.isMouseDown = true;
 			this.isPinned = false;
 			this.hide();
 		});
 
-		this.plugin.registerDomEvent(document, "mouseup", (e: MouseEvent) => {
+		this.plugin.registerDomEvent(activeDocument, "mouseup", (e: MouseEvent) => {
 			if (this.toolbarEl?.contains(e.target as Node)) return;
 			this.isMouseDown = false;
 			this.isPinned = false;
 			if (!this.plugin.settings.enabled) return;
-			if (this.showTimeout !== null) clearTimeout(this.showTimeout);
-			this.showTimeout = setTimeout(() => this.checkAndShow(), 30);
+			if (this.showTimeout !== null) window.clearTimeout(this.showTimeout);
+			this.showTimeout = window.setTimeout(() => this.checkAndShow(), 30);
 		});
 
 		this.plugin.registerDomEvent(window, "resize", () => {
-			if (this.toolbarEl?.style.visibility !== "visible") return;
+			if (!this.toolbarEl?.hasClass("tt-visible")) return;
 			this.isPinned = false;
-			if (this.showTimeout !== null) clearTimeout(this.showTimeout);
-			this.showTimeout = setTimeout(() => this.checkAndShow(), 100);
+			if (this.showTimeout !== null) window.clearTimeout(this.showTimeout);
+			this.showTimeout = window.setTimeout(() => this.checkAndShow(), 100);
 		});
 
-		this.plugin.registerDomEvent(document, "focusin", (e: FocusEvent) => {
+		this.plugin.registerDomEvent(activeDocument, "focusin", (e: FocusEvent) => {
 			if (this.toolbarEl?.contains(e.target as Node)) return;
 			const workspaceEl = this.plugin.app.workspace.containerEl;
 			if (!workspaceEl.contains(e.target as Node)) {
@@ -56,7 +58,7 @@ export default class TextToolbarManager {
 			}
 		});
 
-		this.plugin.registerDomEvent(document, "selectionchange", () => {
+		this.plugin.registerDomEvent(activeDocument, "selectionchange", () => {
 			if (this.isMouseDown) return;
 			if (!this.plugin.settings.enabled) return;
 
@@ -71,14 +73,13 @@ export default class TextToolbarManager {
 				return;
 			}
 
-			if (this.showTimeout !== null) clearTimeout(this.showTimeout);
-			this.showTimeout = setTimeout(() => this.checkAndShow(), 80);
+			if (this.showTimeout !== null) window.clearTimeout(this.showTimeout);
+			this.showTimeout = window.setTimeout(() => this.checkAndShow(), 80);
 		});
 	}
 
 	private createToolbar(): void {
-		this.toolbarEl = document.body.createDiv({ cls: "tt-toolbar" });
-		this.toolbarEl.style.visibility = "hidden";
+		this.toolbarEl = activeDocument.body.createDiv({ cls: "tt-toolbar" });
 		this.renderButtons();
 	}
 
@@ -103,8 +104,7 @@ export default class TextToolbarManager {
 			this.toolbarEl.createDiv({ cls: "tt-toolbar-divider" });
 			for (const cmd of this.externalCommands) {
 				this.addButton(cmd.icon, cmd.name, () => {
-					// eslint-disable-next-line @typescript-eslint/no-explicit-any
-					(this.plugin.app as any).commands.executeCommandById(cmd.id);
+					(this.plugin.app as App & { commands: { executeCommandById(id: string): boolean } }).commands.executeCommandById(cmd.id);
 					this.hide();
 				});
 			}
@@ -129,13 +129,13 @@ export default class TextToolbarManager {
 		if (id === "copy") { this.execCopy(); return; }
 		if (id === "cut")  { this.execCut();  return; }
 
-		const frozenTop  = this.toolbarEl?.style.top;
-		const frozenLeft = this.toolbarEl?.style.left;
+		const frozenTop  = this.lastTop;
+		const frozenLeft = this.lastLeft;
 
 		this.isPinned = true;
 		this.formatPending = true;
 		if (this.showTimeout !== null) {
-			clearTimeout(this.showTimeout);
+			window.clearTimeout(this.showTimeout);
 			this.showTimeout = null;
 		}
 
@@ -152,12 +152,11 @@ export default class TextToolbarManager {
 		}
 
 		if (this.toolbarEl && frozenTop && frozenLeft) {
-			this.toolbarEl.style.top  = frozenTop;
-			this.toolbarEl.style.left = frozenLeft;
-			this.toolbarEl.style.visibility = "visible";
+			this.toolbarEl.setCssProps({ "--tt-top": frozenTop, "--tt-left": frozenLeft });
+			this.toolbarEl.addClass("tt-visible");
 		}
 
-		requestAnimationFrame(() => { this.formatPending = false; });
+		window.requestAnimationFrame(() => { this.formatPending = false; });
 	}
 
 	private toggleInlineFormat(marker: string): void {
@@ -266,18 +265,18 @@ export default class TextToolbarManager {
 		const view = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
 		if (view) {
 			const text = view.editor.getSelection();
-			navigator.clipboard.writeText(text);
+			void navigator.clipboard.writeText(text);
 		}
 		this.isPinned = true;
 		this.formatPending = true;
-		requestAnimationFrame(() => { this.formatPending = false; });
+		window.requestAnimationFrame(() => { this.formatPending = false; });
 	}
 
 	private execCut(): void {
 		const view = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
 		if (view) {
 			const text = view.editor.getSelection();
-			navigator.clipboard.writeText(text);
+			void navigator.clipboard.writeText(text);
 			view.editor.replaceSelection("");
 		}
 		this.hide();
@@ -310,7 +309,6 @@ export default class TextToolbarManager {
 		setIcon(btn.createSpan({ cls: "tt-dropdown-trigger-caret" }), "chevron-down");
 
 		const dropdown = wrapper.createDiv({ cls: "tt-dropdown tt-heading-dropdown" });
-		dropdown.style.display = "none";
 
 		const items: { label: string; level: number | null }[] = [
 			{ label: "Regular text", level: null },
@@ -332,7 +330,6 @@ export default class TextToolbarManager {
 			const row = dropdown.createEl("button", { cls });
 			const checkEl = row.createSpan({ cls: "tt-dropdown-check" });
 			setIcon(checkEl, "check");
-			checkEl.style.visibility = "hidden";
 			checkEls.push(checkEl);
 			row.createSpan({ text: item.label });
 
@@ -345,14 +342,14 @@ export default class TextToolbarManager {
 
 		btn.addEventListener("mousedown", (e: MouseEvent) => {
 			e.preventDefault();
-			if (dropdown.style.display === "none") {
+			if (!dropdown.hasClass("tt-open")) {
 				const view = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
 				const current = view ? this.getCurrentHeadingLevel(view.editor) : null;
 				items.forEach((item, i) => {
-					checkEls[i].style.visibility = item.level === current ? "visible" : "hidden";
+					checkEls[i].toggleClass("tt-check-visible", item.level === current);
 				});
 				this.closeDropdown();
-				dropdown.style.display = "";
+				dropdown.addClass("tt-open");
 				this.activeDropdown = dropdown;
 			} else {
 				this.closeDropdown();
@@ -388,7 +385,6 @@ export default class TextToolbarManager {
 		setIcon(btn.createSpan({ cls: "tt-dropdown-trigger-caret" }), "chevron-down");
 
 		const dropdown = wrapper.createDiv({ cls: "tt-dropdown" });
-		dropdown.style.display = "none";
 
 		const items: { icon: string; label: string; cmd: string; type: "bullet" | "numbered" | "checkbox" }[] = [
 			{ icon: "list",         label: "List",          cmd: "editor:toggle-bullet-list",      type: "bullet"   },
@@ -402,7 +398,6 @@ export default class TextToolbarManager {
 			const row = dropdown.createEl("button", { cls: "tt-dropdown-item" });
 			const checkEl = row.createSpan({ cls: "tt-dropdown-check" });
 			setIcon(checkEl, "check");
-			checkEl.style.visibility = "hidden";
 			checkEls.push(checkEl);
 			setIcon(row.createSpan({ cls: "tt-dropdown-icon" }), item.icon);
 			row.createSpan({ text: item.label });
@@ -410,22 +405,21 @@ export default class TextToolbarManager {
 			row.addEventListener("mousedown", (e: MouseEvent) => {
 				e.preventDefault();
 				this.closeDropdown();
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				(this.plugin.app as any).commands.executeCommandById(item.cmd);
+				(this.plugin.app as App & { commands: { executeCommandById(id: string): boolean } }).commands.executeCommandById(item.cmd);
 				this.hide();
 			});
 		}
 
 		btn.addEventListener("mousedown", (e: MouseEvent) => {
 			e.preventDefault();
-			if (dropdown.style.display === "none") {
+			if (!dropdown.hasClass("tt-open")) {
 				const view = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
 				const current = view ? this.getCurrentListType(view.editor) : null;
 				items.forEach((item, i) => {
-					checkEls[i].style.visibility = item.type === current ? "visible" : "hidden";
+					checkEls[i].toggleClass("tt-check-visible", item.type === current);
 				});
 				this.closeDropdown();
-				dropdown.style.display = "";
+				dropdown.addClass("tt-open");
 				this.activeDropdown = dropdown;
 			} else {
 				this.closeDropdown();
@@ -435,7 +429,7 @@ export default class TextToolbarManager {
 
 	private closeDropdown(): void {
 		if (this.activeDropdown) {
-			this.activeDropdown.style.display = "none";
+			this.activeDropdown.removeClass("tt-open");
 			this.activeDropdown = null;
 		}
 	}
@@ -466,9 +460,8 @@ export default class TextToolbarManager {
 		this.lastRect = rect;
 		this.renderButtons();
 
-		this.toolbarEl.style.top = "-9999px";
-		this.toolbarEl.style.left = "-9999px";
-		this.toolbarEl.style.visibility = "visible";
+		this.toolbarEl.setCssProps({ "--tt-top": "-9999px", "--tt-left": "-9999px" });
+		this.toolbarEl.addClass("tt-visible");
 
 		const tbHeight = this.toolbarEl.offsetHeight || 36;
 		const tbWidth  = this.toolbarEl.offsetWidth  || 200;
@@ -482,13 +475,14 @@ export default class TextToolbarManager {
 		left = Math.max(gap, Math.min(left, window.innerWidth  - tbWidth  - gap));
 		top  = Math.max(gap, Math.min(top,  window.innerHeight - tbHeight - gap));
 
-		this.toolbarEl.style.top  = `${top}px`;
-		this.toolbarEl.style.left = `${left}px`;
+		this.lastTop  = `${top}px`;
+		this.lastLeft = `${left}px`;
+		this.toolbarEl.setCssProps({ "--tt-top": this.lastTop, "--tt-left": this.lastLeft });
 	}
 
 	private hide(): void {
 		if (this.toolbarEl) {
-			this.toolbarEl.style.visibility = "hidden";
+			this.toolbarEl.removeClass("tt-visible");
 		}
 		this.closeDropdown();
 	}
