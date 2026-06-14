@@ -126,15 +126,25 @@
 		align-items: center;
 		gap: 1px;
 
-		.tt-dropdown-trigger-icon svg {
-			width: var(--icon-s);
-			height: var(--icon-s);
+		.tt-dropdown-trigger-icon {
+			display: flex;
+			align-items: center;
+
+			svg {
+				width: var(--icon-s);
+				height: var(--icon-s);
+			}
 		}
 
-		.tt-dropdown-trigger-caret svg {
-			width: 10px;
-			height: 10px;
-			opacity: 0.6;
+		.tt-dropdown-trigger-caret {
+			display: flex;
+			align-items: center;
+
+			svg {
+				width: 10px;
+				height: 10px;
+				opacity: 0.6;
+			}
 		}
 	}
 
