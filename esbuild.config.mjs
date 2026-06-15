@@ -1,6 +1,6 @@
 import esbuild from "esbuild";
 import process from "process";
-import builtins from "builtin-modules";
+import { builtinModules } from "module";
 import { sassPlugin } from "esbuild-sass-plugin";
 import { copyFileSync } from "fs";
 
@@ -17,7 +17,7 @@ const buildOptions = {
 		"@codemirror/language",
 		"@codemirror/state",
 		"@codemirror/view",
-		...builtins,
+		...builtinModules,
 	],
 	format: "cjs",
 	target: "es2017",
