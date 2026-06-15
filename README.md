@@ -1,3 +1,9 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/b278d61d-7ab0-431f-b911-2474d16381a7">
+  <source media="(prefers-color-scheme: light)" srcset="https://github.com/user-attachments/assets/996ae572-1f24-4b22-b972-b67215cb8fd2">
+  <img alt="Shows project promo image in light and dark mode">
+</picture>
+
 # Text Formatting Toolbar
 
 A floating formatting toolbar that appears above selected text in the Obsidian editor.
