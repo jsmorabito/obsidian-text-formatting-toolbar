@@ -29,6 +29,11 @@ You can show or hide individual toolbar buttons under Settings → Text Formatti
 
 **Clipboard access** — the Copy and Cut buttons write your currently selected editor text to the system clipboard. The plugin never reads from the clipboard and never accesses content copied from outside Obsidian.
 
+## Credits
+
+1. https://github.com/quorafind/Obsidian-Mini-Toolbar
+2. https://github.com/Aidenlx/Obsidian-Mini-Toolbar
+
 ## License
 
 MIT
