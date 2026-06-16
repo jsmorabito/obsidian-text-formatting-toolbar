@@ -22,6 +22,6 @@ export const TEXT_TOOLBAR_DEFAULT_COMMANDS: {
 ];
 
 export const DEFAULT_SETTINGS: TextToolbarSettings = {
-	enabled: false,
+	enabled: true,
 	hideCommands: [],
 };
