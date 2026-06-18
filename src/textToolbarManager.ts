@@ -19,7 +19,7 @@ export default class TextToolbarManager {
 
 	public constructor(plugin: TextToolbarPlugin) {
 		this.plugin = plugin;
-		this.plugin.app.workspace.onLayoutReady(() => this.init());
+		this.init();
 	}
 
 	private init(): void {
