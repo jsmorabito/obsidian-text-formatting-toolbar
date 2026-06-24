@@ -1,6 +1,15 @@
 import { App, Editor, MarkdownView, Platform, setIcon } from "obsidian";
 import { TEXT_TOOLBAR_DEFAULT_COMMANDS } from "./constants";
 import { TextToolbarExternalCommand } from "./types";
+import {
+	applyHeading,
+	getHeadingLevel,
+	getListType,
+	toggleBlockquote,
+	toggleCodeBlock,
+	toggleInlineFormat,
+	wrapLink,
+} from "./formatting";
 import type TextToolbarPlugin from "./main";
 
 export default class TextToolbarManager {
@@ -169,58 +178,36 @@ export default class TextToolbarManager {
 		const sel = editor.getSelection();
 		if (!sel) return;
 
-		const m    = marker.length;
 		const from = editor.getCursor("from");
 		const to   = editor.getCursor("to");
+		const line = editor.getLine(from.line);
 
 		const prefixMatch = sel.match(/^(#{1,6} |> |- \[[ xX]\] |[-*+] |\d+\. )/);
-		const prefix  = prefixMatch ? prefixMatch[0] : "";
-		const content = sel.slice(prefix.length);
+		const prefix = prefixMatch ? prefixMatch[0] : "";
 		const contentCh = from.ch + prefix.length;
+		const m = marker.length;
 
+		const result = toggleInlineFormat({ sel, from, to, line }, marker);
+
+		// Case 2: markers sit just outside the current selection — expand then replace
 		if (
 			from.line === to.line &&
-			content.length > m * 2 &&
-			content.substring(0, m) === marker &&
-			content.substring(content.length - m) === marker &&
-			(m > 1 || (content[m] !== marker[0] && content[content.length - m - 1] !== marker[0]))
+			contentCh >= m && to.ch + m <= line.length &&
+			line.substring(contentCh - m, contentCh) === marker &&
+			line.substring(to.ch, to.ch + m) === marker &&
+			result.replacement === sel.slice(prefix.length)
 		) {
-			const inner = content.substring(m, content.length - m);
-			editor.replaceSelection(prefix + inner);
 			editor.setSelection(
-				{ line: from.line, ch: contentCh },
-				{ line: from.line, ch: contentCh + inner.length },
+				{ line: from.line, ch: contentCh - m },
+				{ line: to.line,   ch: to.ch + m },
 			);
+			editor.replaceSelection(result.replacement);
+			editor.setSelection(result.newFrom, result.newTo);
 			return;
 		}
 
-		if (from.line === to.line) {
-			const line = editor.getLine(from.line);
-			if (contentCh >= m && to.ch + m <= line.length) {
-				const before = line.substring(contentCh - m, contentCh);
-				const after  = line.substring(to.ch, to.ch + m);
-				if (before === marker && after === marker) {
-					editor.setSelection(
-						{ line: from.line, ch: contentCh - m },
-						{ line: to.line,   ch: to.ch + m },
-					);
-					editor.replaceSelection(content);
-					editor.setSelection(
-						{ line: from.line, ch: contentCh - m },
-						{ line: from.line, ch: contentCh - m + content.length },
-					);
-					return;
-				}
-			}
-		}
-
-		editor.replaceSelection(`${prefix}${marker}${content}${marker}`);
-		if (from.line === to.line) {
-			editor.setSelection(
-				{ line: from.line, ch: contentCh + m },
-				{ line: from.line, ch: contentCh + m + content.length },
-			);
-		}
+		editor.replaceSelection(result.replacement);
+		editor.setSelection(result.newFrom, result.newTo);
 	}
 
 	private execBlockquote(): void {
@@ -230,13 +217,10 @@ export default class TextToolbarManager {
 		const from = editor.getCursor("from");
 		const to   = editor.getCursor("to");
 
-		const lines = Array.from({ length: to.line - from.line + 1 }, (_, i) => from.line + i);
-		const allQuoted = lines.every(n => editor.getLine(n).startsWith("> "));
-
-		for (const n of lines) {
-			const line = editor.getLine(n);
-			editor.setLine(n, allQuoted ? line.slice(2) : `> ${line}`);
-		}
+		const lineNums = Array.from({ length: to.line - from.line + 1 }, (_, i) => from.line + i);
+		const lineTexts = lineNums.map(n => editor.getLine(n));
+		const toggled = toggleBlockquote(lineTexts);
+		lineNums.forEach((n, i) => editor.setLine(n, toggled[i]));
 		this.hide();
 	}
 
@@ -244,12 +228,7 @@ export default class TextToolbarManager {
 		const view = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
 		if (!view) return;
 		const editor = view.editor;
-		const sel = editor.getSelection();
-		if (sel.startsWith("```\n") && sel.endsWith("\n```") && sel.length > 8) {
-			editor.replaceSelection(sel.slice(4, -4));
-		} else {
-			editor.replaceSelection(`\`\`\`\n${sel}\n\`\`\``);
-		}
+		editor.replaceSelection(toggleCodeBlock(editor.getSelection()));
 		this.hide();
 	}
 
@@ -257,10 +236,10 @@ export default class TextToolbarManager {
 		const view = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
 		if (!view) return;
 		const editor = view.editor;
-		const sel  = editor.getSelection();
 		const from = editor.getCursor("from");
-		editor.replaceSelection(`[${sel}]()`);
-		editor.setCursor({ line: from.line, ch: from.ch + 1 + sel.length + 2 });
+		const [result, cursorCh] = wrapLink(editor.getSelection(), from.ch);
+		editor.replaceSelection(result);
+		editor.setCursor({ line: from.line, ch: cursorCh });
 		this.hide();
 	}
 
@@ -286,17 +265,11 @@ export default class TextToolbarManager {
 	}
 
 	private getCurrentHeadingLevel(editor: Editor): number | null {
-		const line = editor.getLine(editor.getCursor().line);
-		const m = line.match(/^(#{1,6}) /);
-		return m ? m[1].length : null;
+		return getHeadingLevel(editor.getLine(editor.getCursor().line));
 	}
 
 	private getCurrentListType(editor: Editor): "bullet" | "numbered" | "checkbox" | null {
-		const line = editor.getLine(editor.getCursor().line);
-		if (/^- \[[ xX]\] /.test(line)) return "checkbox";
-		if (/^[-*+] /.test(line))        return "bullet";
-		if (/^\d+\. /.test(line))         return "numbered";
-		return null;
+		return getListType(editor.getLine(editor.getCursor().line));
 	}
 
 	private addHeadingDropdown(): void {
@@ -366,11 +339,9 @@ export default class TextToolbarManager {
 		const editor = view.editor;
 		const from = editor.getCursor("from");
 		const to   = editor.getCursor("to");
-		const prefix = level !== null ? "#".repeat(level) + " " : "";
 
 		for (let n = from.line; n <= to.line; n++) {
-			const line = editor.getLine(n);
-			editor.setLine(n, prefix + line.replace(/^#{1,6} /, ""));
+			editor.setLine(n, applyHeading(editor.getLine(n), level));
 		}
 		this.hide();
 	}
